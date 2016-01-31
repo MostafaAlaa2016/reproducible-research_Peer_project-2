@@ -1,0 +1,7 @@
+name: Publish Document
+account: rpubs
+server: rpubs.com
+bundleId:
+        https://api.rpubs.com/api/v1/document/148431/f020cf70a6134bbe833352477a97e50b
+url: http://rpubs.com/MostafaAlaa/148431
+when: 1454202923.61

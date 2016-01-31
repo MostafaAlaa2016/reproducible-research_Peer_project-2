@@ -1,0 +1,207 @@
+---
+title: "Reproducible Research: Peer Assessment 2"
+author: "Mostafa Alaa"
+date: "10 Jan 2016"
+output: 
+  html_document: 
+    fig_caption: yes
+    toc: yes
+---
+
+
+Synonpsis
+---
+In this report, we will analyze the impact of different events and which of these events are most harmful with respect to population health and economy problems for communities and municipalities based on the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. The major estmate we will use is the  We will use the estimates of  fatalities, injuries, and property damage, and preventing such outcomes to decide which types of event are most harmful to the population health and economy. After our analysis we found that excessive heat and tornado are most harmful with respect to population health, while flood, drought, and hurricane/typhoon have the greatest economic consequences.
+
+Documents settings
+---
+```{r}
+echo = TRUE  # For All the document make code visible
+locale_original <- Sys.getlocale( category = "LC_TIME" )
+Sys.setlocale("LC_TIME", "English")
+options(scipen = 1)  # Turn off scientific notations for numbers
+```
+
+Load Needed Libraries
+------
+```{r Library_Chunk,message = FALSE,warning = FALSE}
+library(ggplot2)
+library(plyr)
+library(lattice)
+library(sqldf)
+library(R.utils)
+library(gridExtra)
+```
+
+Data Processing
+---
+1. Download the data
+
+
+```{r Download_Chunk,message = FALSE,warning = FALSE}
+setwd("E:/Learning/Master/Data Science/Reproducible Research/Project 2") #Set the project directory path
+
+#check data exists #if no download
+
+if (!"repdata_data_StormData.csv.bz2" %in% dir("./NOAADataSet/")) 
+        {
+                download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", destfile = "NOAADataSet/repdata_data_StormData.csv.bz2")
+        }
+
+```
+
+2. Extract Zipped file
+
+
+```{r Extraction_Chunk,message = FALSE,warning = FALSE}
+#check if the file extracted before don't extract again
+  if (!"repdata_data_StormData.csv" %in% dir("./NOAADataSet/")) {
+              bunzip2("NOAADataSet/repdata_data_StormData.csv.bz2", overwrite=T, remove=F)
+}
+```
+
+3.Load the Data from File
+
+
+```{r Load_Chunk,results='markup',cache = TRUE,message = FALSE,warning = FALSE}
+#check if the file exist in the working environment don't load it again due to the huge size 
+if (!"stormDS" %in% ls()) {
+    stormDS <- read.csv("NOAADataSet/repdata_data_StormData.csv", sep = ",")
+}
+
+head(stormDS, n = 2)
+
+# subset the data to health and economic impact analysis against weather
+# event
+```
+We can figure out the data dim 902297 rows and 37 columns in total. Events from 1950:2011 . In the first years of the database there there are fewer events recorded if we compare with the most recent years should be considered more complete Most likely due to the data was not completed. Let's view the data.
+
+```{r Exploring_Chunk_Hist,results='markup',message = FALSE,warning = FALSE}
+
+    stormDS$year <- as.numeric(format(as.Date(stormDS$BGN_DATE, format = "%m/%d/%Y %H:%M:%S"), "%Y"))
+
+hist(stormDS$year, breaks = 20)
+
+
+
+```
+
+4. Data Cleansing and Preparation
+
+in this section we will make two main data manipulation 
+A. Get the Subset column of the data which we are interested in.
+B. Column handle: is aimed to convert the property damage and crop damage data into comparable numerical forms according to the meaning of units described in the code book for each observation where we have Hundred (H), Thousand (K), Million (M) and Billion (B).
+
+```{r Data_Cleansing_Chunk,results='markup',cache = TRUE,message = FALSE,warning =FALSE} 
+mycol_interest <- c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", 
+    "CROPDMGEXP")
+storm <- stormDS[mycol_interest]
+
+# exploring the property exponent
+unique(storm$PROPDMGEXP)
+
+# exploring the crop exponent data
+unique(storm$CROPDMGEXP)
+
+
+colHandler <- function(dataset = storm, fieldName, newFieldName) {
+    totalLen <- dim(dataset)[2]
+    index <- which(colnames(dataset) == fieldName)
+    dataset[, index] <- as.character(dataset[, index])
+    logic <- !is.na(toupper(dataset[, index]))
+    dataset[logic & toupper(dataset[, index]) == "B", index] <- "9"
+    dataset[logic & toupper(dataset[, index]) == "M", index] <- "6"
+    dataset[logic & toupper(dataset[, index]) == "K", index] <- "3"
+    dataset[logic & toupper(dataset[, index]) == "H", index] <- "2"
+    dataset[logic & toupper(dataset[, index]) == "", index] <- "0"
+    dataset[, index] <- as.numeric(dataset[, index])
+    dataset[is.na(dataset[, index]), index] <- 0
+    dataset <- cbind(dataset, dataset[, index - 1] * 10^dataset[, index])
+    names(dataset)[totalLen + 1] <- newFieldName
+    return(dataset)
+}
+
+storm <- colHandler(storm, "PROPDMGEXP", "PROPDMGE")
+storm <- colHandler(storm, "CROPDMGEXP", "CROPDMGE")
+
+```
+
+
+
+Impact on Public Health
+---
+In this section, we will check the number of fatalities and injuries that are happened by Event Type. We will get the top 10 severe for each one.
+
+```{r Health_Analysis_Chunk,results='markup',cache = TRUE,message = FALSE,warning = FALSE}
+fatalities  <- sqldf("select EVTYPE, SUM(FATALITIES) FATALITIES from storm group by EVTYPE order by FATALITIES DESC LIMIT 10",row.names = TRUE)
+
+
+injury  <- sqldf("select EVTYPE, SUM(INJURIES) INJURIES from storm group by EVTYPE order by INJURIES DESC LIMIT 10",row.names = TRUE)
+
+
+
+``` 
+Impact on Economy
+---
+The two major column that impact into the economy is the PROPDMGE and CROPDMGE
+
+
+```{r Economy_Analysis_Chunk,results='markup',cache = TRUE,message = FALSE,warning = FALSE}
+
+
+proddmge  <- sqldf("select EVTYPE, SUM(PROPDMGE) PROPDMGE from storm group by EVTYPE order by PROPDMGE DESC LIMIT 10",row.names = TRUE)
+
+
+cropdmge  <- sqldf("select EVTYPE, SUM(CROPDMGE) CROPDMGE from storm group by EVTYPE order by CROPDMGE DESC LIMIT 10",row.names = TRUE)
+```
+
+
+
+
+
+Results
+---
+
+Aross the United States, Which types of events are nost harmful with respect to population health?
+
+
+```{r Results_fatalities_Analysis_Chunk,results='markup',cache = TRUE,message = FALSE,warning = FALSE}
+
+fatalities
+
+injury
+
+par(mfrow = c(1, 2), mar = c(12, 4, 3, 2), mgp = c(3, 1, 0), cex = 0.7)
+barplot(fatalities$FATALITIES, las = 3, names.arg = fatalities$EVTYPE, main = "Weather Events With Top 10 Highest Fatalities", 
+    ylab = "number of fatalities", col = "red")
+barplot(injury$INJURIES, las = 3, names.arg = injury$EVTYPE, main = "Weather Events With Top 10 Highest Injuries", 
+    ylab = "number of injuries", col = "red")
+```
+With looking in the figure we can for sure say that: The most harmful weather event to population health is Tornado.It is cause for both the highest fatalities and the highest injuries across United States.
+
+Across the United States, which types of events have the greatest economic consequences?
+---
+
+```{r Results_Economy_Analysis_Chunk,results='markup',cache = TRUE,message = FALSE,warning = FALSE}
+
+proddmge
+
+cropdmge
+
+par(mfrow = c(1, 2), mar = c(12, 4, 3, 2), mgp = c(3, 1, 0), cex = 0.7)
+barplot(proddmge$PROPDMGE, las = 3, names.arg = proddmge$EVTYPE, 
+    main = "Top 10 Events with Greatest Property Damages", ylab = "Cost of damages", 
+    col = "red")
+barplot(cropdmge$CROPDMGE, las = 3, names.arg = cropdmge$EVTYPE, 
+    main = "Top 10 Events With Greatest Crop Damages", ylab = "Cost of damages", 
+    col = "red")
+```
+
+The weather events that have the greatest economic consequences are: flood, drought, Tornado and Typhoon.
+
+If we divided it we will find that in Property Damage we will find that flood and tornado are the most one, However in crop damage the drought and flood are the most.
+
+Conclusion
+---
+
+From these data, we found that tornado and excessive heat are most harmful with respect to population health, while flood, drought, and hurricane/typhoon have the greatest economic consequences. I think we must start with tornado due to its harmful for both side health and economy.
