@@ -1,9 +1,11 @@
 ---
-title: "Reproducible Research: Peer Assessment 2"
+title: 'Reproducible Research: Peer Assessment 2'
 author: "Mostafa Alaa"
 date: "10 Jan 2016"
-output: 
-  html_document: 
+output:
+  pdf_document:
+    toc: yes
+  html_document:
     fig_caption: yes
     toc: yes
 ---
